@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  cfc-webhook-degrosser
+
+  Sample SAM Template for cfc-webhook-degrosser
+
+Globals:
+  Function:
+    Timeout: 6
+    Runtime: python3.8
+
+Parameters:
+  DegrosserFormSpreeAllowedData:
+    Description: Required. JSON structure of the allowed formspree data and its associated webhook URL.
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: 'DegrosserFormSpreeAllowedData'
+
+Resources:
+  WebhookDegrosserAPI:
+    Type: AWS::Serverless::HttpApi
+
+  FormSpreeWebhookFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/formspree/
+      Handler: app.lambda_handler
+      Layers:
+        - !Ref LambdaWebhookHitterLayer
+      Environment:
+        Variables:
+          FORMSPREE_ALLOWED_FORMS: !Ref DegrosserFormSpreeAllowedData
+      Events:
+        FormSpreeWebhook:
+          Type: HttpApi
+          Properties:
+            Method: POST
+            RouteSettings:
+              ThrottlingBurstLimit: 2
+              ThrottlingRateLimit: 1
+            Path: /formspree
+
+  LambdaWebhookHitterLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      CompatibleRuntimes:
+        - python3.8
+      RetentionPolicy: Retain
+      LayerName: webhook-degrosser-webhook-hitter
+      Description: Handles the webhook request sending
+      ContentUri: layers/webhook_hitter
+    Metadata:
+      BuildMethod: makefile
